@@ -1,0 +1,32 @@
+# API de synchronisation FINPILOT. La base Neon est fournie par DATABASE_URL (avec sslmode=require).
+services:
+  - type: web
+    name: finpilot-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py migrate --noinput && gunicorn finpilot_server.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    healthCheckPath: /api/health/
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: FINPILOT_CORS_ORIGINS
+        value: https://finpilot-pilotage.web.app,https://finpilot-pilotage.firebaseapp.com
+      - key: FINPILOT_PUBLIC_URL
+        value: https://finpilot-pilotage.web.app
+      - key: FINPILOT_REGISTRATION
+        value: invite
+      - key: VAPID_SUBJECT
+        value: mailto:admin@finpilot-pilotage.web.app
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false

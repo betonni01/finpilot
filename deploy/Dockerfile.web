@@ -1,0 +1,17 @@
+# Construit l'application (PWA) puis la sert avec Caddy, qui gère aussi le HTTPS.
+FROM node:22-alpine AS build
+WORKDIR /src
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY index.html vite.config.ts tsconfig.json ./
+COPY public ./public
+COPY src ./src
+COPY scripts ./scripts
+# Modèle de reconnaissance vocale privée, servi par ton serveur (aucun audio ne quitte l'appareil)
+ARG WHISPER_MODEL=onnx-community/whisper-base
+RUN node scripts/fetch-whisper.mjs "$WHISPER_MODEL" || echo "Modèle vocal non téléchargé : repli sur Hugging Face au premier usage"
+RUN npx vite build
+
+FROM caddy:2-alpine
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=build /src/dist /srv

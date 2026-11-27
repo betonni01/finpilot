@@ -1,0 +1,29 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API Django
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Application (PWA)
+	handle {
+		root * /srv
+		@sw path /sw.js /push-sw.js /manifest.webmanifest
+		header @sw Cache-Control "no-cache"
+		@heavy path /ort/* /models/*
+		header @heavy Cache-Control "public, max-age=2592000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+		Cross-Origin-Opener-Policy same-origin
+		Cross-Origin-Embedder-Policy require-corp
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: https://api.frankfurter.dev https://huggingface.co https://*.huggingface.co https://*.hf.co; frame-src 'self' blob:; worker-src 'self' blob:; manifest-src 'self'"
+	}
+}

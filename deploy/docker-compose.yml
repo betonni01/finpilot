@@ -1,0 +1,65 @@
+# FINPILOT : application + serveur de synchronisation + notifications.
+# Usage : cp .env.example .env (puis remplir), puis : docker compose up -d --build
+name: finpilot
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finpilot
+      POSTGRES_USER: finpilot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?à définir dans .env}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finpilot"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ../server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://finpilot:${POSTGRES_PASSWORD}@db:5432/finpilot
+      DJANGO_ALLOWED_HOSTS: ${DOMAIN},api,localhost
+      DJANGO_CSRF_TRUSTED_ORIGINS: https://${DOMAIN}
+    depends_on:
+      db: { condition: service_healthy }
+
+  worker:
+    build: ../server
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://finpilot:${POSTGRES_PASSWORD}@db:5432/finpilot
+    command: ["python", "manage.py", "send_reminders", "--loop", "--interval", "60"]
+    depends_on:
+      api: { condition: service_started }
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        WHISPER_MODEL: ${WHISPER_MODEL:-onnx-community/whisper-base}
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?à définir dans .env}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: [caddy_data:/data, caddy_config:/config]
+    depends_on: [api]
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [./backups:/backups]
+    entrypoint: ["sh", "-c", "while true; do pg_dump -h db -U finpilot finpilot | gzip > /backups/finpilot-$$(date +%F).sql.gz; find /backups -name '*.sql.gz' -mtime +30 -delete; sleep 86400; done"]
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

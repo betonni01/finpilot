@@ -78,6 +78,14 @@ class Invite(models.Model):
         return {"id": self.id, "code": self.code, "note": self.note, "max_uses": self.max_uses, "uses": self.uses, "expires_at": self.expires_at, "revoked": self.revoked, "valid": self.is_valid(), "created_at": self.created_at}
 
 
+class SharedBoard(models.Model):
+    """Grille de tontine publiée. Le serveur ne stocke que le chiffré : la clé reste dans le lien, jamais ici."""
+    id = models.CharField(max_length=64, primary_key=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shared_boards")
+    payload = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class PasswordReset(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="password_resets")
     code_hash = models.CharField(max_length=200)

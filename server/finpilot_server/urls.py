@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from sync import accounts, views
+from sync import accounts, shares, views
 
 urlpatterns = [
     path("api/health/", views.health),
@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/push/vapid/", views.vapid_key),
     path("api/push/subscribe/", views.subscribe),
     path("api/push/reminders/", views.reminders),
+    path("api/shares/<str:pk>/", shares.share),
     path("api/admin/users/", accounts.admin_users),
     path("api/admin/users/<int:pk>/", accounts.admin_user),
     path("api/admin/users/<int:pk>/reset-code/", accounts.admin_reset_code),

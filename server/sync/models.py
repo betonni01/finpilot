@@ -79,11 +79,60 @@ class Invite(models.Model):
 
 
 class SharedBoard(models.Model):
-    """Grille de tontine publiée. Le serveur ne stocke que le chiffré : la clé reste dans le lien, jamais ici."""
+    """Grille publiée (tontine ou dette). Le serveur ne stocke que le chiffré : la clé reste dans le lien, jamais ici."""
     id = models.CharField(max_length=64, primary_key=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="shared_boards")
+    # organizer pour une tontine, debtor ou creditor pour une dette.
+    owner_seat = models.CharField(max_length=40, default="organizer")
     payload = models.TextField()
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class BoardClaim(models.Model):
+    """Un compte se désigne comme un participant, ou comme l'autre côté d'une dette."""
+    board = models.ForeignKey(SharedBoard, on_delete=models.CASCADE, related_name="claims")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="board_claims")
+    seat = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["board", "user"], name="one_claim_user"),
+            models.UniqueConstraint(fields=["board", "seat"], name="one_claim_seat"),
+        ]
+
+
+class BoardWatch(models.Model):
+    """Compte qui a ouvert le lien : il reçoit les notifications, sans voir les montants."""
+    board = models.ForeignKey(SharedBoard, on_delete=models.CASCADE, related_name="watches")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="board_watches")
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["board", "user"], name="one_watch")]
+
+
+class BoardSignature(models.Model):
+    """Signature d'une ligne. Le serveur garde l'empreinte, pas le montant."""
+    board = models.ForeignKey(SharedBoard, on_delete=models.CASCADE, related_name="signatures")
+    kind = models.CharField(max_length=16)
+    ref = models.CharField(max_length=160)
+    role = models.CharField(max_length=16)
+    signer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="board_signatures")
+    digest = models.CharField(max_length=64)
+    signed_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["board", "ref", "role"], name="one_signature")]
+
+
+class Notice(models.Model):
+    """Message dans le compte. Le texte ne contient pas de montant."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notices")
+    board_id = models.CharField(max_length=64)
+    title = models.CharField(max_length=120)
+    body = models.CharField(max_length=300)
+    path = models.CharField(max_length=40)
+    created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(null=True, blank=True)
 
 
 class PasswordReset(models.Model):
